@@ -20,19 +20,18 @@ jobs:
 
       - name: Build
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          GOOS=linux GOARCH=amd64 go build -o truto-mcp-stdio-linux-amd64-v$VERSION
-          GOOS=darwin GOARCH=amd64 go build -o truto-mcp-stdio-darwin-amd64-v$VERSION
-          GOOS=darwin GOARCH=arm64 go build -o truto-mcp-stdio-darwin-arm64-v$VERSION
-          GOOS=windows GOARCH=amd64 go build -o truto-mcp-stdio-windows-amd64-v$VERSION.exe
+          GOOS=linux GOARCH=amd64 go build -o truto-mcp-stdio-linux-amd64-v${{ github.ref_name }}
+          GOOS=darwin GOARCH=amd64 go build -o truto-mcp-stdio-darwin-amd64-v${{ github.ref_name }}
+          GOOS=darwin GOARCH=arm64 go build -o truto-mcp-stdio-darwin-arm64-v${{ github.ref_name }}
+          GOOS=windows GOARCH=amd64 go build -o truto-mcp-stdio-windows-amd64-v${{ github.ref_name }}.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            truto-mcp-stdio-linux-amd64-v$VERSION
-            truto-mcp-stdio-darwin-amd64-v$VERSION
-            truto-mcp-stdio-darwin-arm64-v$VERSION
-            truto-mcp-stdio-windows-amd64-v$VERSION.exe
+            truto-mcp-stdio-linux-amd64-v${{ github.ref_name }}
+            truto-mcp-stdio-darwin-amd64-v${{ github.ref_name }}
+            truto-mcp-stdio-darwin-arm64-v${{ github.ref_name }}
+            truto-mcp-stdio-windows-amd64-v${{ github.ref_name }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
