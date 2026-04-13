@@ -1,6 +1,16 @@
 # Truto MCP Stdio Proxy
 
-A CLI program that acts as a Stdio proxy for HTTP Streamable MCP servers. It reads newline-delimited JSON-RPC messages from stdin, forwards them to a specified MCP server endpoint via POST requests, and writes the responses to stdout.
+A CLI program that bridges stdio-based MCP clients to HTTP Streamable MCP servers. It reads newline-delimited JSON-RPC messages from stdin, forwards them to a specified MCP server endpoint via HTTP POST, handles SSE streaming responses, and writes the responses to stdout.
+
+Implements the [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http) (spec version 2025-11-25).
+
+## Features
+
+- **Streamable HTTP transport** -- full support for both `application/json` and `text/event-stream` responses
+- **Session management** -- automatically tracks `MCP-Session-Id` across requests
+- **Protocol version negotiation** -- extracts `protocolVersion` from the initialize handshake and sends `MCP-Protocol-Version` on subsequent requests
+- **Server-initiated messages** -- opens a background GET SSE stream for server-to-client notifications and requests, with automatic reconnection
+- **Session cleanup** -- sends HTTP DELETE on shutdown to cleanly terminate the session
 
 ## Requirements
 
@@ -24,61 +34,156 @@ chmod +x truto-mcp-stdio-<platform>-v<version>
 
 ### Building from Source
 
-To build the program from source, run:
-
 ```bash
 go build -o truto-mcp-stdio
 ```
 
 ## Usage
 
-Run the program with:
-
 ```bash
-./truto-mcp-stdio-<platform>-v<version> <API_URL>
+./truto-mcp-stdio <API_URL>
 ```
 
 ### Arguments
 
-- `<API_URL>`: The API endpoint URL to forward requests to (required)
+- `<API_URL>`: The MCP server HTTP endpoint URL (required)
 
-### Example Usage
+### Example
 
 ```bash
-# Using echo to send a JSON-RPC message
-echo '{"jsonrpc": "2.0", "method": "example", "params": {}, "id": 1}' | ./truto-mcp-stdio-linux-amd64-v1.0.0 https://api.truto.one/mcp/6b33593a-bcbc-4c59-adad-d21fadbce0b0
-
-# Using a file as input
-cat requests.json | ./truto-mcp-stdio-linux-amd64-v1.0.0 https://api.truto.one/mcp/6b33593a-bcbc-4c59-adad-d21fadbce0b0
+echo '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}, "id": 1}' | ./truto-mcp-stdio https://api.truto.one/mcp/<your-mcp-id>
 ```
 
-### Usage with Claude
+## Client Setup
 
-To use this proxy with Claude, add the following configuration to your Claude settings:
+Below are setup instructions for all major MCP clients. Replace `/path/to/truto-mcp-stdio` with the actual path to the binary and `<your-mcp-id>` with your Truto MCP endpoint ID.
+
+### Cursor
+
+Config file: `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-scoped)
 
 ```json
 {
   "mcpServers": {
-    "outlook": {
-      "command": "truto-mcp-stdio-<platform>-v<version>",
-      "args": ["https://api.truto.one/mcp/6b33593a-bcbc-4c59-adad-d21fedadbc0b0"]
+    "truto": {
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
     }
   }
 }
 ```
 
-This configuration will allow Claude to use the proxy for making API calls to the specified endpoint.
+Cursor hot-reloads config changes -- no restart needed.
+
+### Claude Desktop
+
+Config file locations:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "truto": {
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
+    }
+  }
+}
+```
+
+Requires a full restart of Claude Desktop after editing.
+
+### Claude Code (CLI)
+
+Add via the CLI:
+
+```bash
+claude mcp add truto -- /path/to/truto-mcp-stdio https://api.truto.one/mcp/<your-mcp-id>
+```
+
+Or create `.mcp.json` at your project root:
+
+```json
+{
+  "mcpServers": {
+    "truto": {
+      "type": "stdio",
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot)
+
+Create `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "truto": {
+      "type": "stdio",
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
+    }
+  }
+}
+```
+
+> **Note:** VS Code uses `"servers"` as the root key, not `"mcpServers"`.
+
+### Windsurf
+
+Config file locations:
+- macOS/Linux: `~/.codeium/windsurf/mcp_config.json`
+- Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "truto": {
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
+    }
+  }
+}
+```
+
+Requires a restart of Windsurf after editing.
+
+### Cline (VS Code Extension)
+
+Add via the MCP Servers panel in the Cline sidebar, or edit the config file directly:
+
+- macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- Windows: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+
+```json
+{
+  "mcpServers": {
+    "truto": {
+      "command": "/path/to/truto-mcp-stdio",
+      "args": ["https://api.truto.one/mcp/<your-mcp-id>"]
+    }
+  }
+}
+```
 
 ## Development
-
-To run the program during development:
 
 ```bash
 go run truto-mcp-stdio.go <API_URL>
 ```
 
-## Input/Output Format
+## How It Works
 
-- Input: Newline-delimited JSON-RPC messages from stdin
-- Output: API responses written to stdout
-- Errors: Error messages are written to stderr 
+1. Reads JSON-RPC messages line-by-line from stdin
+2. Sends each message as an HTTP POST to the MCP endpoint with the required `Accept`, `MCP-Session-Id`, and `MCP-Protocol-Version` headers
+3. Handles responses in both `application/json` and `text/event-stream` (SSE) formats
+4. Extracts `MCP-Session-Id` from the server's initialize response and includes it on all subsequent requests
+5. Extracts the negotiated `protocolVersion` and sends it as the `MCP-Protocol-Version` header
+6. Opens a background GET SSE stream after initialization for server-initiated messages, with automatic reconnection
+7. On shutdown (stdin close or signal), sends HTTP DELETE to cleanly terminate the session
+8. Errors and diagnostics are written to stderr
