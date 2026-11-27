@@ -26,6 +26,25 @@ type initializeResult struct {
 	ProtocolVersion string `json:"protocolVersion"`
 }
 
+// version is set when a release is built (-ldflags "-X main.version=1.0.4").
+var version = "dev"
+
+// userAgentTransport names this program on every request it sends, so
+// Truto can tell bridge traffic from other clients.
+type userAgentTransport struct {
+	base http.RoundTripper
+}
+
+func (t userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("User-Agent", "truto-mcp-stdio/"+version)
+	return t.base.RoundTrip(req)
+}
+
+func newClient() *http.Client {
+	return &http.Client{Transport: userAgentTransport{base: http.DefaultTransport}}
+}
+
 var stdoutMu sync.Mutex
 
 func writeStdout(line string) {
@@ -227,7 +246,7 @@ func main() {
 	}
 
 	apiURL := os.Args[1]
-	client := &http.Client{}
+	client := newClient()
 
 	var sessionID string
 	var protocolVersion string
