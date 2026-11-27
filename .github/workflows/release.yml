@@ -20,10 +20,11 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=linux GOARCH=amd64 go build -o truto-mcp-stdio-linux-amd64-${{ github.ref_name }}
-          GOOS=darwin GOARCH=amd64 go build -o truto-mcp-stdio-darwin-amd64-${{ github.ref_name }}
-          GOOS=darwin GOARCH=arm64 go build -o truto-mcp-stdio-darwin-arm64-${{ github.ref_name }}
-          GOOS=windows GOARCH=amd64 go build -o truto-mcp-stdio-windows-amd64-${{ github.ref_name }}.exe
+          LDFLAGS="-X main.version=${GITHUB_REF_NAME#v}"
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o truto-mcp-stdio-linux-amd64-${{ github.ref_name }}
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o truto-mcp-stdio-darwin-amd64-${{ github.ref_name }}
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o truto-mcp-stdio-darwin-arm64-${{ github.ref_name }}
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o truto-mcp-stdio-windows-amd64-${{ github.ref_name }}.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
